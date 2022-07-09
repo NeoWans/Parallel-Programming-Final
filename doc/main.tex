@@ -186,14 +186,58 @@ rulesepcolor= \color{ red!20!green!20!blue!20}
 
 \subsection{实验环境和相关配置}
 实验在本地 x86 Arch Linux 环境下完成，使用 Makefile 构建项目，开启 Ofast 加速；
-使用的 CPU 为 AMD Ryzen 8C16T，显卡为 nVIDIA RTX 2060。
+使用的 CPU 为 AMD Ryzen 8C16T，显卡为 nVIDIA RTX 2060 6G。
 
 \subsection{串行稀疏矩阵算法}
 使用STL list存储矩阵中每行的非零位置，逐行放入嵌套的外层STL list；
-使用STL map存储消元行首项与消元行的映射
+使用STL map存储消元行首项与消元行的映射。
+
+\begin{lstlisting}[frame=trbl, language={C++}, caption={稀疏矩阵消元部分}]
+void gauss(list_matrix_t& m) {
+  for (auto& eliminatee : m.op) {
+    while (!eliminatee.empty()) {
+      auto  key        = *(eliminatee.cbegin());
+      auto& eliminater = m.pool[key];
+      if (eliminater.empty()) {
+        eliminater = eliminatee;
+        break;
+      } else {
+        auto jt = eliminatee.begin();
+        auto it = eliminater.cbegin();
+        while (it != eliminater.cend() && jt != eliminatee.end())
+          if (*it > *jt) eliminatee.insert(jt, *it++);
+          else if (*it == *jt) jt = eliminatee.erase(jt), ++it;
+          else ++jt;
+        for (; it != eliminater.cend(); ++it) eliminatee.push_back(*it);
+      }
+    }
+  }
+}
+\end{lstlisting}
 
 \subsection{串行位元矩阵算法}
+使用STL bitset倒序存储矩阵每行，逐行放入嵌套的外层STL list；
+使用STL map存储消元行首项与消元行的映射。
 
+其中值得注意的是，STL bitset提供了快速查询最低真值位索引的内建成员函数\_Find\_first()，与之对应的是算法需要$lp(E[i])$操作，即获得被消元行第i行的首项，然而正序存储时\_Find\_first函数得到的是被消元行第i行的末项，因此需要倒序存储。具体实现使用了"bsmap"宏 \ref{code:bsmap} 处理映射关系。由于STL bitset需要使用常量模板参数声明，因此使用了 "matrix\_max\_sz" 常量，大小为 85401，即测试样例中的最大矩阵大小。bsmap可以保证定义域和陪域在 $[0, matrix\_max\_sz)$ 内且为双射，同时满足 $\forall{x \in [0, matrix\_max\_sz)}\ bsmap(bsmap(x)) = x$。
+\begin{lstlisting}[frame=trbl, language={C++}, caption={bsmap 宏}, label = {code:bsmap}]
+#define bsmap(i) (matrix_max_sz - 1 - (i))
+\end{lstlisting}
+
+\begin{lstlisting}[frame=trbl, language={C++}, caption={位元矩阵消元部分}]
+void gauss(bitset_matrix_t& m) {
+  for (auto& eliminatee : m.op) {
+    while (eliminatee.any()) {
+      auto  key        = bsmap(eliminatee._Find_first());
+      auto& eliminater = m.pool[key];
+      if (eliminater.none()) {
+        eliminater = eliminatee;
+        break;
+      } else eliminatee ^= eliminater;
+    }
+  }
+}
+\end{lstlisting}
 
 \section{算法分析}
 \subsection{正确性分析}

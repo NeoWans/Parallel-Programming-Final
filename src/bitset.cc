@@ -18,6 +18,10 @@ void gauss(bitset_matrix_t& m) {
   }
 }
 
+// 必须接受至少一个参数，第一个参数指向输入目录，内容为 i.0 i.1 i.2，表示 i
+// 组数据的非零消元子 被消元行
+// 样例消元结果。第二可选参数指向输出目录，如果存在则向目录内写入 i.out
+// 文件，代表程序的消元结果。程序会向标准输出打印每组测试样例的用时。
 signed main(int argc, char* argv[]) {
   if (argc < 2) exit(EXIT_FAILURE);
   ios_base::sync_with_stdio(false);
