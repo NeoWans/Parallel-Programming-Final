@@ -186,7 +186,7 @@ rulesepcolor= \color{ red!20!green!20!blue!20}
 
 \subsection{实验环境和相关配置}
 实验在本地 x86 Arch Linux 环境下完成，使用 Makefile 构建项目，开启 Ofast 加速；
-使用的 CPU 为 AMD Ryzen 8C16T，显卡为 nVIDIA RTX 2060 6G。
+使用的 CPU 为 AMD Ryzen 4800HS，系统 RAM 大小为 38.6G，显卡为 nVIDIA RTX 2060 6G。
 
 \subsection{串行稀疏矩阵算法}
 使用STL list存储矩阵中每行的非零位置，逐行放入嵌套的外层STL list；
@@ -254,22 +254,23 @@ void gauss(bitset_matrix_t& m) {
 由于华为鲲鹏服务器工作不稳定，所以只在本地 x86 环境实验。
 \begin{table}[]
   \centering
-  \caption{不同串行方法运行时间}
-  \label{tab:serial-time}
+  \caption{不同串行方法运行情况}
+  \label{tab:serial}
   \resizebox{\textwidth}{!}{%
-    \begin{tabular}{lll}
-      Rank  & serial list (ms) & serial bitset (ms) \\
-      130   & 0.03233          & 0.099817           \\
-      254   & 1.867949         & 3.173488           \\
-      562   & 4.735001         & 3.08886            \\
-      1011  & 78.952469        & 98.256365          \\
-      2362  & 827.574329       & 426.11729          \\
-      3799  & 15708.6549       & 5026.35341         \\
-      8399  & 273776.479       & 30331.4359         \\
-      23045 & N/A              & 220484.326         \\
-      37960 & N/A              & 322201.459         \\
-      43577 & N/A              & 1016832.99         \\
-      85401 & 96746.3559       & 440.782952
+    \begin{tabular}{|lll|}
+      \hline
+      Rank  & serial list (ms)      & serial bitset (ms) \\ \hline
+      130   & 0.03233               & 0.099817           \\ \hline
+      254   & 1.867949              & 3.173488           \\ \hline
+      562   & 4.735001              & 3.08886            \\ \hline
+      1011  & 78.952469             & 98.256365          \\ \hline
+      2362  & 827.574329            & 426.11729          \\ \hline
+      3799  & 15708.6549            & 5026.35341         \\ \hline
+      8399  & 273776.479            & 30331.4359         \\ \hline
+      23045 & \textgreater{}1200000 & 220484.326         \\ \hline
+      37960 & \textgreater{}1200000 & 322201.459         \\ \hline
+      43577 & \textgreater{}1200000 & 1016832.99         \\ \hline
+      85401 & 96746.3559            & 440.782952         \\ \hline
     \end{tabular}%
   }
 \end{table}
