@@ -1,6 +1,7 @@
 /res/
 /misc/
 /list
+/bitset
 
 *.*#
 *~
