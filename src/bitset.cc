@@ -1,27 +1,19 @@
 #include <bits/stdc++.h>
 
+#include "bitset_matrix.hh"
 #include "constant.hh"
-#include "list_matrix.hh"
 using namespace std;
 namespace fs = filesystem;
 
-void gauss(list_matrix_t& m) {
+void gauss(bitset_matrix_t& m) {
   for (auto& eliminatee : m.op) {
-    while (!eliminatee.empty()) {
-      auto  key        = *(eliminatee.cbegin());
+    while (eliminatee.any()) {
+      auto  key        = bsmap(eliminatee._Find_first());
       auto& eliminater = m.pool[key];
-      if (eliminater.empty()) {
+      if (eliminater.none()) {
         eliminater = eliminatee;
         break;
-      } else {
-        auto jt = eliminatee.begin();
-        auto it = eliminater.cbegin();
-        while (it != eliminater.cend() && jt != eliminatee.end())
-          if (*it > *jt) eliminatee.insert(jt, *it++);
-          else if (*it == *jt) jt = eliminatee.erase(jt), ++it;
-          else ++jt;
-        for (; it != eliminater.cend(); ++it) eliminatee.push_back(*it);
-      }
+      } else eliminatee ^= eliminater;
     }
   }
 }
@@ -31,7 +23,7 @@ signed main(int argc, char* argv[]) {
   ios_base::sync_with_stdio(false);
   cin.tie(nullptr), cout.tie(nullptr);
   for (size_t i = 1; i <= cases; ++i) {
-    list_matrix_t m;
+    bitset_matrix_t m;
     m.read(argv[1], i);
     auto t1 = chrono::high_resolution_clock::now();
     gauss(m);
@@ -50,7 +42,9 @@ signed main(int argc, char* argv[]) {
       ofs.open(out_file);
       auto cout_orig = cout.rdbuf(ofs.rdbuf());
       for (const auto& line : m.op) {
-        for (auto pos : line) cout << pos << " ";
+        for (auto idx = line._Find_first(), pos = bsmap(idx); idx < line.size();
+             idx = line._Find_next(idx), pos = bsmap(idx))
+          cout << pos << " ";
         cout << '\n';
       }
       cout.rdbuf(cout_orig);
