@@ -175,9 +175,11 @@ rulesepcolor= \color{ red!20!green!20!blue!20}
   \end{algorithmic}
 \end{breakablealgorithm}
 
+特殊高斯消去法
+
 \section{研究设计}
-源码链接：
-\url{https://github.com/ArcanusNEO/Parallel-Programming/tree/master/8}
+项目链接：
+\url{https://github.com/NeoWans/Parallel-Programming-Final}
 
 \subsection{测试用例}
 测试用例由老师提供的Groebner.7z压缩包解压后获得，总共11组数据，软链接至res/目录下，命名规则为\%组号\%.0 (非零消元子)、\%组号\%.1 (被消元行)、\%组号\%.2 (消元结果)
@@ -194,11 +196,39 @@ rulesepcolor= \color{ red!20!green!20!blue!20}
 
 
 \section{算法分析}
-\subsection{复杂度分析}
+\subsection{正确性分析}
 
+\subsection{正确性验证}
+由于 \%组号\%.2 (样例正确消元结果) 被链接到res/目录下，而 \%组号\%.out (程序计算结果) 被输出到 misc/ 目录下，使用 diff -wB misc/\%组号\%.out res/\%组号\%.2 即可在忽略输出格式差异的前提下判断消元是否正确。每次运行完成只需运行单行脚本 \ref{code:diff} 即可判断正确性。经过验证，所有实现均保证了正确性。
+\begin{lstlisting}[frame=trbl, language={bash}, caption={单行 Bash 脚本}, label = {code:diff}]
+  for i in {1..11}; do diff -wB "misc/$i.out" "res/$i.2"; done
+\end{lstlisting}
+
+\subsection{复杂度分析}
 
 \subsection{运行时间分析}
 由于华为鲲鹏服务器工作不稳定，所以只在本地 x86 环境实验。
 
+\begin{table}[]
+  \centering
+  \caption{不同串行方法运行时间}
+  \label{tab:serial-time}
+  \resizebox{\textwidth}{!}{%
+    \begin{tabular}{lll}
+      Scale & serial list (ms) & serial bitset (ms) \\
+      130   & 0.03233          & NA                 \\
+      254   & 1.867949         & NA                 \\
+      562   & 4.735001         & NA                 \\
+      1011  & 78.952469        & NA                 \\
+      2362  & 827.574329       & NA                 \\
+      3799  & 15708.6549       & NA                 \\
+      8399  & 273776.479       & NA                 \\
+      23045 & NA               & NA                 \\
+      37960 & NA               & NA                 \\
+      43577 & NA               & NA                 \\
+      85401 & 96746.3559       & NA
+    \end{tabular}%
+  }
+\end{table}
 
 \end{document}
