@@ -253,25 +253,26 @@ void gauss(bitset_matrix_t& m) {
 \subsection{运行时间分析}
 \subsubsection{计时方式}
 
+
 \begin{table}[]
   \centering
-  \caption{不同串行方法运行情况}
-  \label{tab:serial}
+  \caption{不同方法运行情况}
+  \label{tab:compare}
   \resizebox{\textwidth}{!}{%
-    \begin{tabular}{|lll|}
+    \begin{tabular}{|llll|}
       \hline
-      Rank  & serial list (ms)      & serial bitset (ms) \\ \hline
-      130   & 0.03233               & 0.099817           \\ \hline
-      254   & 1.867949              & 3.173488           \\ \hline
-      562   & 4.735001              & 3.08886            \\ \hline
-      1011  & 78.952469             & 98.256365          \\ \hline
-      2362  & 827.574329            & 426.11729          \\ \hline
-      3799  & 15708.6549            & 5026.35341         \\ \hline
-      8399  & 273776.479            & 30331.4359         \\ \hline
-      23045 & \textgreater{}1200000 & 220484.326         \\ \hline
-      37960 & \textgreater{}1200000 & 322201.459         \\ \hline
-      43577 & \textgreater{}1200000 & 1016832.99         \\ \hline
-      85401 & 96746.3559            & 440.782952         \\ \hline
+      Matrix rank & serial list (ms)      & serial bitset (ms) & 16 threads bitset (ms) \\ \hline
+      130         & 0.03233               & 0.099817           & 2.402953               \\ \hline
+      254         & 1.867949              & 3.173488           & 2.272141               \\ \hline
+      562         & 4.735001              & 3.08886            & 1.877817               \\ \hline
+      1011        & 78.952469             & 98.256365          & 12.519157              \\ \hline
+      2362        & 827.574329            & 426.11729          & 58.782182              \\ \hline
+      3799        & 15708.6549            & 5026.35341         & 649.369009             \\ \hline
+      8399        & 273776.479            & 30331.4359         & 5585.23381             \\ \hline
+      23045       & \textgreater{}1200000 & 220484.326         & 49605.6164             \\ \hline
+      37960       & \textgreater{}1200000 & 322201.459         & 77384.6553             \\ \hline
+      43577       & \textgreater{}1200000 & 1016832.99         & 252625.626             \\ \hline
+      85401       & 96746.3559            & 440.782952         & 85.025176              \\ \hline
     \end{tabular}%
   }
 \end{table}
