@@ -149,12 +149,12 @@ rulesepcolor= \color{ red!20!green!20!blue!20}
 
 \section{问题描述}
 \subsection{普通高斯消去法}
-普通高斯消去的计算模式如图 \ref{gauss} 所示，在第$k$步时，对第$k$行从$(k, k)$开始进行除法操作，并且将后续的$k + 1$至$N$行进行减去第$k$行的操作，串行算法如下面伪代码所示。
+普通高斯消去的计算模式如图 \ref{pic:gauss} 所示，在第$k$步时，对第$k$行从$(k, k)$开始进行除法操作，并且将后续的$k + 1$至$N$行进行减去第$k$行的操作，串行算法如下面伪代码所示。
 \begin{figure}
   \centering
   \includegraphics[width=1\textwidth]{gauss.png}
   \caption{高斯消去法示意图}
-  \label{gauss}
+  \label{pic:gauss}
 \end{figure}
 \begin{breakablealgorithm}
   \caption{普通高斯消元算法伪代码}
@@ -224,7 +224,12 @@ $lp(E[i])$：被消元行第 $i$ 行的首项
 \url{https://github.com/NeoWans/Parallel-Programming-Final}
 
 \subsection{测试用例}
-测试用例由老师提供的Groebner.7z压缩包解压后获得，总共11组数据，软链接至res/目录下，命名规则为\%组号\%.0 (非零消元子)、\%组号\%.1 (被消元行)、\%组号\%.2 (消元结果)
+测试用例由老师提供的Groebner.7z压缩包解压后获得，总共11组数据，软链接至res/目录下，如图 \ref{pic:dir}，命名规则为\%组号\%.0 (非零消元子)、\%组号\%.1 (被消元行)、\%组号\%.2 (消元结果)
+\begin{figure}
+  \centering
+  \includegraphics[width=1\textwidth]{dir.png}
+  \label{pic:dir}
+\end{figure}
 
 \subsection{实验环境和相关配置}
 实验在本地 x86 Arch Linux 环境下完成，使用 Makefile 构建项目，开启 Ofast 加速；
@@ -294,31 +299,31 @@ void gauss(bitset_matrix_t& m) {
 经过观察可以发现，外层循环就是并行化改造的入手点。这里采取了按照循环划分的方法，将线程id与行对线程总数的模数对应。由于存在被消元子成为非零消元子的可能，非零消元子不是只读访问。因此使用可升级的读写锁最符合直觉。即访问非零消元子前需要获取读锁，如果需要对消元子复制，则将读锁升级为写锁。这样借助boost::upgrade\_lock就有了一种使用读写锁实现 \ref{code:upgrade-lock}，具体来说，其中：boost::upgrade\_lock<boost::shared\_mutex>实现加读锁，boost::upgrade\_to\_unique\_lock<boost::shared\_mutex>实现将读锁升级为写锁。
 
 \begin{lstlisting}[frame=trbl, language={C++}, caption={upgrade\_lock 位元矩阵消元部分}, label={code:upgrade-lock}]
-  const auto num_thread = thread::hardware_concurrency();
-  boost::shared_mutex mutex_main;
-  void thread_callback(size_t index, bitset_matrix_t& m) {
-    for (size_t local_index = index; local_index < m.op.size();
-         local_index += num_thread) {
-      auto& eliminatee = m.op.at(local_index);
-      while (eliminatee.any()) {
-        auto key = bsmap(eliminatee._Find_first());
-        boost::upgrade_lock<boost::shared_mutex> read_lock(mutex_main);
-        auto&                                    eliminater = m.pool[key];
-        if (eliminater.none()) {
-          boost::upgrade_to_unique_lock<boost::shared_mutex> write_lock(
-            read_lock);
-          eliminater = eliminatee;
-          break;
-        } else eliminatee ^= eliminater;
-      }
+const auto num_thread = thread::hardware_concurrency();
+boost::shared_mutex mutex_main;
+void thread_callback(size_t index, bitset_matrix_t& m) {
+  for (size_t local_index = index; local_index < m.op.size();
+       local_index += num_thread) {
+    auto& eliminatee = m.op.at(local_index);
+    while (eliminatee.any()) {
+      auto key = bsmap(eliminatee._Find_first());
+      boost::upgrade_lock<boost::shared_mutex> read_lock(mutex_main);
+      auto&                                    eliminater = m.pool[key];
+      if (eliminater.none()) {
+        boost::upgrade_to_unique_lock<boost::shared_mutex> write_lock(
+          read_lock);
+        eliminater = eliminatee;
+        break;
+      } else eliminatee ^= eliminater;
     }
   }
-  void gauss(bitset_matrix_t& m) {
-    list<thread> thread_pool;
-    for (unsigned i = 0; i < num_thread; ++i)
-      thread_pool.push_back(thread(thread_callback, i, ref(m)));
-    for (auto& t : thread_pool) t.join();
-  }
+}
+void gauss(bitset_matrix_t& m) {
+  list<thread> thread_pool;
+  for (unsigned i = 0; i < num_thread; ++i)
+    thread_pool.push_back(thread(thread_callback, i, ref(m)));
+  for (auto& t : thread_pool) t.join();
+}
 \end{lstlisting}
 
 然而经过测试，这种实现的计算效率甚至不如串行算法（表\ref{tab:thread}），因此有了下面的 call\_once 实现。
@@ -393,7 +398,46 @@ bitset的异或操作非常迅速：在RAM模型中，约定计算机字长为$w
 
 对于倒排链表的数据结构，重点再与"异或"运算，我们使用了双指针的解决方法：同时从两个链表头遍历至链表尾，中间只要有某个数不是双方均存在，就插入结果链表中；否则就相当于异或的消去动作。对于双指针的移动方式，可以根据数值大小判断：如果一方指向的数值较大，相当于走的快了，需要原地等待，移动另一指针；如果数值相等则一起移动。
 
-对于call\_once的使用，我们在对每一个可能的非零消元子建立一个once\_flag，读取预设的非零消元子时就将对应的once\_flag翻转。因此可以保证检查某个非零消元子是否存在只要检查call\_once后标志exist是否被设定；而在call\_once的回调函数内只需要简单的直接设定exist为假，并将该被消元子复制到消元子映射表中即可。
+对于call\_once的使用，我们在对每一个可能的非零消元子建立一个once\_flag，读取预设的非零消元子时就将对应的once\_flag翻转，参考读取矩阵部分代码 \ref{code:read}。因此可以保证检查某个非零消元子是否存在只要检查call\_once后标志exist是否被设定；而在call\_once的回调函数内只需要简单的直接设定exist为假，并将该被消元子复制到消元子映射表中即可。
+
+\begin{lstlisting}[frame=trbl, language={C++}, caption={读取矩阵部分}, label={code:read}]
+using namespace std;
+namespace fs = filesystem;
+
+void bitset_matrix_t::read(const char* dir, int test_case) {
+  row_sz = matrix_sz[test_case];
+  ostringstream oss;
+  fs::path      res_dir(dir);
+  oss << test_case;
+  auto     pool_file = res_dir / (oss.str() + ".0");
+  ifstream ifs;
+  ifs.open(pool_file);
+  cin.rdbuf(ifs.rdbuf());
+  string line;
+  while (getline(cin, line)) {
+    istringstream iss(line);
+    size_t        key, val;
+    iss >> key;
+    call_once(flag_v[key], []() -> void {});
+    auto& row = pool[key];
+    row.set(bsmap(key));
+    while (iss >> val) row.set(bsmap(val));
+  }
+  ifs.close();
+  auto op_file = res_dir / (oss.str() + ".1");
+  ifs.open(op_file);
+  cin.rdbuf(ifs.rdbuf());
+  op_sz = 0;
+  while (getline(cin, line)) {
+    istringstream iss(line);
+    size_t        val;
+    bitset_t      row;
+    while (iss >> val) row.set(bsmap(val));
+    op[op_sz++] = move(row);
+  }
+  ifs.close();
+}  
+\end{lstlisting}
 
 \subsection{正确性验证}
 由于 \%组号\%.2 (样例正确消元结果) 被链接到res/目录下，而 \%组号\%.out (程序计算结果) 被输出到 misc/ 目录下。
