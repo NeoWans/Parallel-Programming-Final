@@ -1,5 +1,5 @@
-CC = clang
-CXX = clang++
+CC = gcc
+CXX = g++
 CXXFLAGS = -Wall -Wextra -std=c++17 -Ofast -Iinc -pthread
 OBJ = constant.o
 INC = constant.hh
