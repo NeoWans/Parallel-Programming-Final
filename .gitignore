@@ -2,6 +2,7 @@
 /misc/
 /list
 /bitset
+/bitset_rwlock_thread
 /bitset_thread
 
 *.*#

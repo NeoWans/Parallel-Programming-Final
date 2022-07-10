@@ -192,7 +192,7 @@ rulesepcolor= \color{ red!20!green!20!blue!20}
 使用STL list存储矩阵中每行的非零位置，逐行放入嵌套的外层STL list；
 使用STL map存储消元行首项与消元行的映射。
 
-\begin{lstlisting}[frame=trbl, language={C++}, caption={稀疏矩阵消元部分}]
+\begin{lstlisting}[frame=trbl, language={C++}, caption={串行稀疏矩阵消元部分}]
 void gauss(list_matrix_t& m) {
   for (auto& eliminatee : m.op) {
     while (!eliminatee.empty()) {
@@ -216,7 +216,7 @@ void gauss(list_matrix_t& m) {
 \end{lstlisting}
 
 \subsection{串行位元矩阵算法}
-使用STL bitset倒序存储矩阵每行，逐行放入外层STL vector；
+使用STL bitset倒序存储矩阵每行，逐行放入外层STL list；
 使用STL map存储消元行首项与消元行的映射。
 
 其中值得注意的是，STL bitset提供了快速查询最低真值位索引的内建成员函数\_Find\_first()，与之对应的是算法需要$lp(E[i])$操作，即获得被消元行第i行的首项，然而正序存储时\_Find\_first函数得到的是被消元行第i行的末项，因此需要倒序存储。具体实现使用了"bsmap"宏 \ref{code:bsmap} 处理映射关系。由于STL bitset需要使用常量模板参数声明，因此使用了 "matrix\_max\_sz" 常量，大小为 85401，即测试样例中的最大矩阵大小。bsmap可以保证定义域和陪域在 $[0, matrix\_max\_sz)$ 内且为双射，同时满足 $\forall{x \in [0, matrix\_max\_sz)}\ bsmap(bsmap(x)) = x$。
@@ -224,7 +224,7 @@ void gauss(list_matrix_t& m) {
 #define bsmap(i) (matrix_max_sz - 1 - (i))
 \end{lstlisting}
 
-\begin{lstlisting}[frame=trbl, language={C++}, caption={位元矩阵消元部分}]
+\begin{lstlisting}[frame=trbl, language={C++}, caption={串行位元矩阵消元部分}]
 void gauss(bitset_matrix_t& m) {
   for (auto& eliminatee : m.op) {
     while (eliminatee.any()) {
@@ -239,18 +239,94 @@ void gauss(bitset_matrix_t& m) {
 }
 \end{lstlisting}
 
+\subsection{并行稀疏矩阵算法}
+由于分析测试数据发现使用链表存储矩阵运行时间远大于bitset存储，常数过大，即使在稀疏矩阵下也仅有内存占用低的优势。然而并行位元矩阵算法在稀疏矩阵下的内存占用也是完全可以接受的，没有研究的必要。
+
+\subsection{并行位元矩阵算法}
+使用STL bitset倒序存储矩阵每行，逐行放入外层数组；
+由于矩阵的秩比较小，而且测试样例存在稠密矩阵，所以决定改用数组存储消元行首项与消元行的映射。
+
+并行化库选择了C++11的标准库thread，可以最大程度保证可移植性。并发线程数量读取thread::hardware\_concurrency()的提示，在本地机器上为16。
+
+经过观察可以发现，外层循环就是并行化改造的入手点。这里采取了按照循环划分的方法，将线程id与行对线程总数的模数对应。由于存在被消元子成为非零消元子的可能，非零消元子不是只读访问。因此使用可升级的读写锁最符合直觉。即访问非零消元子前需要获取读锁，如果需要对消元子复制，则将读锁升级为写锁。这样借助boost::upgrade\_lock就有了一种使用读写锁实现 \ref{code:upgrade-lock}，具体来说，其中：boost::upgrade\_lock<boost::shared\_mutex>实现加读锁，boost::upgrade\_to\_unique\_lock<boost::shared\_mutex>实现将读锁升级为写锁。
+
+\begin{lstlisting}[frame=trbl, language={C++}, caption={upgrade\_lock 位元矩阵消元部分}, label={code:upgrade-lock}]
+  const auto num_thread = thread::hardware_concurrency();
+  boost::shared_mutex mutex_main;
+  void thread_callback(size_t index, bitset_matrix_t& m) {
+    for (size_t local_index = index; local_index < m.op.size();
+         local_index += num_thread) {
+      auto& eliminatee = m.op.at(local_index);
+      while (eliminatee.any()) {
+        auto key = bsmap(eliminatee._Find_first());
+        boost::upgrade_lock<boost::shared_mutex> read_lock(mutex_main);
+        auto&                                    eliminater = m.pool[key];
+        if (eliminater.none()) {
+          boost::upgrade_to_unique_lock<boost::shared_mutex> write_lock(
+            read_lock);
+          eliminater = eliminatee;
+          break;
+        } else eliminatee ^= eliminater;
+      }
+    }
+  }
+  void gauss(bitset_matrix_t& m) {
+    list<thread> thread_pool;
+    for (unsigned i = 0; i < num_thread; ++i)
+      thread_pool.push_back(thread(thread_callback, i, ref(m)));
+    for (auto& t : thread_pool) t.join();
+  }
+\end{lstlisting}
+
+然而经过测试，这种实现的计算效率甚至不如串行算法，因此有了下面的 call\_once 实现。
+
+再次观察可以注意到，实际上映射数组里的每一种消元子只会被初始化一次，能够对应保证线程安全的前提下初始化单例类型的模型，即双重检查锁定模型。换言之存在减少加锁次数提高性能的优化空间。对于支持 C++11 以上的编译器，存在 call\_once 和 once\_flag 原语。对call\_once传入once\_flag标志和回调函数func即可实现线程安全的前提下仅第一次成功调用回调函数func。称为"积极调用"，并对once\_flag翻转；此后再次向call\_once传入once\_flag就直接返回，称为"消极调用"。避免了双重检查锁定模型的繁琐和危险。因此我们有了另一种不使用boost的更快的实现 \ref{code:call-once}。
+
+\begin{lstlisting}[frame=trbl, language={C++}, caption={call\_once 位元矩阵消元部分}, label={code:call-once}]
+const auto num_thread = thread::hardware_concurrency();
+
+void thread_callback(size_t index, bitset_matrix_t& m) {
+  for (size_t local_index = index; local_index < m.op_sz;
+       local_index += num_thread) {
+    auto& eliminatee = m.op[local_index];
+    for (auto idx = eliminatee._Find_first(); idx < eliminatee.size();
+         idx      = eliminatee._Find_first()) {
+      auto key   = bsmap(idx);
+      bool exist = true;
+      call_once(m.flag_v[key], [&]() {
+        exist       = false;
+        m.pool[key] = eliminatee;
+      });
+      if (exist) eliminatee ^= m.pool[key];
+      else break;
+    }
+  }
+}
+
+void gauss(bitset_matrix_t& m) {
+  list<thread> thread_pool;
+  for (unsigned i = 0; i < num_thread; ++i)
+    thread_pool.push_back(thread(thread_callback, i, ref(m)));
+  for (auto& t : thread_pool) t.join();
+}
+\end{lstlisting}
+
 \section{算法分析}
 \subsection{正确性分析}
 
 \subsection{正确性验证}
-由于 \%组号\%.2 (样例正确消元结果) 被链接到res/目录下，而 \%组号\%.out (程序计算结果) 被输出到 misc/ 目录下，使用 diff -wB misc/\%组号\%.out res/\%组号\%.2 即可在忽略输出格式差异的前提下判断消元是否正确。每次运行完成只需运行单行脚本 \ref{code:diff} 即可判断正确性。经过验证，所有实现均保证了正确性。
+由于 \%组号\%.2 (样例正确消元结果) 被链接到res/目录下，而 \%组号\%.out (程序计算结果) 被输出到 misc/ 目录下。
+
+对于串行算法，由于消元次序，选取消元子的次序是固定的，因此答案是固定的，使用 diff -wB misc/\%组号\%.out res/\%组号\%.2 即可在忽略输出格式差异的前提下判断消元是否正确。每次运行完成只需运行单行脚本 \ref{code:diff} 即可判断正确性。经过验证，所有实现均保证了正确性。
 \begin{lstlisting}[frame=trbl, language={bash}, caption={单行 Bash 脚本}, label = {code:diff}]
   for i in {1..11}; do diff -wB "misc/$i.out" "res/$i.2"; done
 \end{lstlisting}
 
+而对于并行算法，消元次序，和选取消元子的次序都不固定。由于异或运算的特殊性，以上两种次序不定不影响结果的正确性，但是也意味着消元的等价结果很多，不能简单的用 diff 程序判断正确性，因此可以使用 Mathematica 等工具辅助检查。
+
 \subsection{复杂度分析}
 
-\subsection{运行时间分析}
+\subsection{运行情况分析}
 \subsubsection{计时方式}
 
 
@@ -261,18 +337,18 @@ void gauss(bitset_matrix_t& m) {
   \resizebox{\textwidth}{!}{%
     \begin{tabular}{|llll|}
       \hline
-      Matrix rank & serial list (ms)      & serial bitset (ms) & 16 threads bitset (ms) \\ \hline
-      130         & 0.03233               & 0.099817           & 2.402953               \\ \hline
-      254         & 1.867949              & 3.173488           & 2.272141               \\ \hline
-      562         & 4.735001              & 3.08886            & 1.877817               \\ \hline
-      1011        & 78.952469             & 98.256365          & 12.519157              \\ \hline
-      2362        & 827.574329            & 426.11729          & 58.782182              \\ \hline
-      3799        & 15708.6549            & 5026.35341         & 649.369009             \\ \hline
-      8399        & 273776.479            & 30331.4359         & 5585.23381             \\ \hline
-      23045       & \textgreater{}1200000 & 220484.326         & 49605.6164             \\ \hline
-      37960       & \textgreater{}1200000 & 322201.459         & 77384.6553             \\ \hline
-      43577       & \textgreater{}1200000 & 1016832.99         & 252625.626             \\ \hline
-      85401       & 96746.3559            & 440.782952         & 85.025176              \\ \hline
+      Matrix rank & serial list (ms)      & serial bitset (ms) & 16 threads call\_once bitset (ms) \\ \hline
+      130         & 0.03233               & 0.099817           & 2.402953                          \\ \hline
+      254         & 1.867949              & 3.173488           & 2.272141                          \\ \hline
+      562         & 4.735001              & 3.08886            & 1.877817                          \\ \hline
+      1011        & 78.952469             & 98.256365          & 12.519157                         \\ \hline
+      2362        & 827.574329            & 426.11729          & 58.782182                         \\ \hline
+      3799        & 15708.6549            & 5026.35341         & 649.369009                        \\ \hline
+      8399        & 273776.479            & 30331.4359         & 5585.23381                        \\ \hline
+      23045       & \textgreater{}1200000 & 220484.326         & 49605.6164                        \\ \hline
+      37960       & \textgreater{}1200000 & 322201.459         & 77384.6553                        \\ \hline
+      43577       & \textgreater{}1200000 & 1016832.99         & 252625.626                        \\ \hline
+      85401       & 96746.3559            & 440.782952         & 85.025176                         \\ \hline
     \end{tabular}%
   }
 \end{table}

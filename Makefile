@@ -8,13 +8,16 @@ vpath %.hh inc
 vpath %.cc src
 
 .PHONY: all
-all: list bitset bitset_thread
+all: list bitset bitset_rwlock_thread bitset_thread
 
 list: $(OBJ) $(INC) list_matrix.o list.cc
 	$(CXX) $(CXXFLAGS) -o list $(OBJ) list_matrix.o $$(find -name 'list.cc')
 
 bitset: $(OBJ) $(INC) bitset_matrix.o bitset.cc
 	$(CXX) $(CXXFLAGS) -o bitset $(OBJ) bitset_matrix.o $$(find -name 'bitset.cc')
+
+bitset_rwlock_thread: $(OBJ) $(INC) bitset_matrix.o bitset_rwlock_thread.cc
+	$(CXX) $(CXXFLAGS) -lboost_thread -o bitset_rwlock_thread $(OBJ) bitset_matrix.o $$(find -name 'bitset_rwlock_thread.cc')
 
 bitset_thread: $(OBJ) $(INC) bitset_matrix_thread.o bitset_thread.cc
 	$(CXX) $(CXXFLAGS) -o bitset_thread $(OBJ) bitset_matrix_thread.o $$(find -name 'bitset_thread.cc')
