@@ -5,6 +5,7 @@ using namespace std;
 namespace fs = filesystem;
 
 void bitset_matrix_t::read(const char* dir, int test_case) {
+  row_sz = matrix_sz[test_case];
   ostringstream oss;
   fs::path      res_dir(dir);
   oss << test_case;

@@ -1,10 +1,12 @@
 #include <bits/stdc++.h>
 
+#include "constant.hh"
 #include "list_matrix.hh"
 using namespace std;
 namespace fs = filesystem;
 
 void list_matrix_t::read(const char* dir, int test_case) {
+  row_sz = matrix_sz[test_case];
   ostringstream oss;
   fs::path      res_dir(dir);
   oss << test_case;

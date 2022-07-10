@@ -9,6 +9,7 @@ public:
   using bitset_t = std::bitset<matrix_max_sz>;
   void read(const char* dir, int test_case);
 
+  size_t                     row_sz;
   std::map<size_t, bitset_t> pool;
-  std::list<bitset_t>        op;
+  std::vector<bitset_t>      op;
 };

@@ -216,7 +216,7 @@ void gauss(list_matrix_t& m) {
 \end{lstlisting}
 
 \subsection{串行位元矩阵算法}
-使用STL bitset倒序存储矩阵每行，逐行放入嵌套的外层STL list；
+使用STL bitset倒序存储矩阵每行，逐行放入外层STL vector；
 使用STL map存储消元行首项与消元行的映射。
 
 其中值得注意的是，STL bitset提供了快速查询最低真值位索引的内建成员函数\_Find\_first()，与之对应的是算法需要$lp(E[i])$操作，即获得被消元行第i行的首项，然而正序存储时\_Find\_first函数得到的是被消元行第i行的末项，因此需要倒序存储。具体实现使用了"bsmap"宏 \ref{code:bsmap} 处理映射关系。由于STL bitset需要使用常量模板参数声明，因此使用了 "matrix\_max\_sz" 常量，大小为 85401，即测试样例中的最大矩阵大小。bsmap可以保证定义域和陪域在 $[0, matrix\_max\_sz)$ 内且为双射，同时满足 $\forall{x \in [0, matrix\_max\_sz)}\ bsmap(bsmap(x)) = x$。
@@ -251,7 +251,8 @@ void gauss(bitset_matrix_t& m) {
 \subsection{复杂度分析}
 
 \subsection{运行时间分析}
-由于华为鲲鹏服务器工作不稳定，所以只在本地 x86 环境实验。
+\subsubsection{计时方式}
+
 \begin{table}[]
   \centering
   \caption{不同串行方法运行情况}

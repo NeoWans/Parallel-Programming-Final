@@ -2,6 +2,7 @@
 /misc/
 /list
 /bitset
+/bitset_thread
 
 *.*#
 *~
