@@ -18,6 +18,7 @@ void bitset_matrix_t::read(const char* dir, int test_case) {
     istringstream iss(line);
     size_t        key, val;
     iss >> key;
+    call_once(flag_v[key], []() -> void {});
     auto& row = pool[key];
     row.set(bsmap(key));
     while (iss >> val) row.set(bsmap(val));

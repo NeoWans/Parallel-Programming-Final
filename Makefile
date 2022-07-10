@@ -1,6 +1,6 @@
 CC = clang
 CXX = clang++
-CXXFLAGS = -Wall -Wextra -std=c++17 -O2 -Iinc -pthread
+CXXFLAGS = -Wall -Wextra -std=c++17 -Ofast -Iinc -pthread
 OBJ = constant.o
 INC = constant.hh
 
