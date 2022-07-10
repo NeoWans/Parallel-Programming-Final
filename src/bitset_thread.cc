@@ -1,29 +1,29 @@
 #include <bits/stdc++.h>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/thread.hpp>
 
 #include "bitset_matrix.hh"
 #include "constant.hh"
 using namespace std;
 namespace fs = filesystem;
 
-const auto          num_thread = thread::hardware_concurrency();
-boost::shared_mutex mutex_main;
+const auto num_thread = thread::hardware_concurrency();
+once_flag  flag_v[matrix_max_sz];
 
 void thread_callback(size_t index, bitset_matrix_t& m) {
   for (size_t local_index = index; local_index < m.op.size();
        local_index += num_thread) {
     auto& eliminatee = m.op.at(local_index);
     while (eliminatee.any()) {
-      auto key = bsmap(eliminatee._Find_first());
-      boost::upgrade_lock<boost::shared_mutex> read_lock(mutex_main);
-      auto&                                    eliminater = m.pool[key];
-      if (eliminater.none()) {
-        boost::upgrade_to_unique_lock<boost::shared_mutex> write_lock(
-          read_lock);
-        eliminater = eliminatee;
-        break;
-      } else eliminatee ^= eliminater;
+      auto key   = bsmap(eliminatee._Find_first());
+      bool added = false;
+      call_once(flag_v[key], [&]() {
+        auto& eliminater = m.pool[key];
+        if (eliminater.none()) {
+          eliminater = eliminatee;
+          added      = true;
+        }
+      });
+      if (added) break;
+      else eliminatee ^= m.pool[key];
     }
   }
 }
