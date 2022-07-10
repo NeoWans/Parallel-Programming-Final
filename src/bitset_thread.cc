@@ -1,18 +1,20 @@
 #include <bits/stdc++.h>
 
-#include "bitset_matrix.hh"
+#include "bitset_matrix_thread.hh"
 #include "constant.hh"
 using namespace std;
 namespace fs = filesystem;
 
-const auto num_thread = thread::hardware_concurrency() - 1;
+const auto      num_thread = thread::hardware_concurrency() - 1;
+bitset_matrix_t m;
 
 void thread_callback(size_t index, bitset_matrix_t& m, once_flag* flag_v) {
-  for (size_t local_index = index; local_index < m.op.size();
+  for (size_t local_index = index; local_index < m.op_sz;
        local_index += num_thread) {
-    auto& eliminatee = m.op.at(local_index);
-    while (eliminatee.any()) {
-      auto key   = bsmap(eliminatee._Find_first());
+    auto& eliminatee = m.op[local_index];
+    for (auto idx = eliminatee._Find_first(); idx < eliminatee.size();
+         idx      = eliminatee._Find_first()) {
+      auto key   = bsmap(idx);
       bool added = false;
       call_once(flag_v[key], [&]() {
         auto& eliminater = m.pool[key];
@@ -45,7 +47,6 @@ signed main(int argc, char* argv[]) {
   ios_base::sync_with_stdio(false);
   cin.tie(nullptr), cout.tie(nullptr);
   for (size_t i = 1; i <= cases; ++i) {
-    bitset_matrix_t m;
     m.read(argv[1], i);
     auto t1 = chrono::high_resolution_clock::now();
     gauss(m);

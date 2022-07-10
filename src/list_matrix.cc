@@ -34,4 +34,5 @@ void list_matrix_t::read(const char* dir, int test_case) {
     while (iss >> val) ls.push_back(val);
     op.push_back(move(ls));
   }
+  ifs.close();
 }
