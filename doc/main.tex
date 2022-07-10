@@ -261,6 +261,7 @@ void gauss(list_matrix_t& m) {
 使用STL bitset倒序存储矩阵每行，逐行放入外层STL list；
 使用STL map存储消元行首项与消元行的映射。
 
+因为STL bitset充分利用了RAM模型下字的操作，如果约定计算机字长为$w$的话，将原本用bool数组的$w$次操作统一成1次，大大减小了时间常数，相当于已执行了SIMD优化。而且在O2以上优化后SIMD的幅度更加大。
 其中值得注意的是，STL bitset提供了快速查询最低真值位索引的内建成员函数\_Find\_first()，与之对应的是算法需要$lp(E[i])$操作，即获得被消元行第i行的首项，然而正序存储时\_Find\_first函数得到的是被消元行第i行的末项，因此需要倒序存储。具体实现使用了"bsmap"宏 \ref{code:bsmap} 处理映射关系。由于STL bitset需要使用常量模板参数声明，因此使用了 "matrix\_max\_sz" 常量，大小为 85401，即测试样例中的最大矩阵大小。bsmap可以保证定义域和陪域在 $[0, matrix\_max\_sz)$ 内且为双射，同时满足 $\forall{x \in [0, matrix\_max\_sz)}\ bsmap(bsmap(x)) = x$。
 \begin{lstlisting}[frame=trbl, language={C++}, caption={bsmap 宏}, label = {code:bsmap}]
 #define bsmap(i) (matrix_max_sz - 1 - (i))
@@ -353,6 +354,39 @@ void gauss(bitset_matrix_t& m) {
 }
 \end{lstlisting}
 
+\subsection{CUDA加速按行划分算法}
+由于 CUDA 是单纯的内存复制，使用复杂的数据结构需要自己实现对内存的操作，并不支持bitset，并且也不支持 call\_once 原语，因此实现过程十分复杂，这里只给出部分上层参考示例代码。
+\begin{lstlisting}[frame=trbl, language={C++}, caption={call\_once 位元矩阵消元部分}, label={code:cuda-row}]
+__global__ void eliminate_kernel(bitset_matrix_t& m) {
+  auto local_index = blockDim.x * blockIdx.x + threadIdx.x;
+  if (local_index >= m.op_sz) return;
+  auto& eliminatee = m.op[local_index];
+  for (auto idx = eliminatee._Find_first(); idx < eliminatee.size();
+       idx      = eliminatee._Find_first()) {
+    auto key   = bsmap(idx);
+    bool exist = true;
+    call_once(m.flag_v[key], [&]() {
+      exist       = false;
+      m.pool[key] = eliminatee;
+    });
+    if (exist) eliminatee ^= m.pool[key];
+    else break;
+  }
+}
+
+void gauss(bitset_matrix_t& m) {
+  dim3 grid(max(ceil(m.op_sz / 1024.0), 1.0));
+  dim3 block(1024);
+  eliminate_kernel<<<grid, block>>>(m);
+  cudaDeviceSynchronize();
+  if (auto ret = cudaGetLastError(); ret != cudaSuccess)
+    cerr << "division kernel failed: " << cudaGetErrorString(ret) << endl;
+}
+\end{lstlisting}
+
+\subsection{CUDA加速异或算法}
+bitset的异或操作非常迅速：在RAM模型中，约定计算机字长为$w$的话，一次异或的复杂度为 $O(\frac{N}{w})$，而单纯拷贝到GPU就需要$O(\frac{N})$的时间，而且拷贝次数频繁，单次数据量不够大，与GPU大带宽高延迟的特性冲突。
+
 \section{算法分析}
 \subsection{正确性分析}
 
@@ -413,7 +447,7 @@ for (size_t i = 1; i <= cases; ++i) {
 
 \begin{table}[]
   \centering
-  \caption{不同方法运行情况}
+  \caption{不同数据结构与并行状态下最快运行情况}
   \label{tab:compare}
   \resizebox{\textwidth}{!}{%
     \begin{tabular}{|llll|}
