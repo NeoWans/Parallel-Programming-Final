@@ -278,7 +278,7 @@ void gauss(bitset_matrix_t& m) {
   }
 \end{lstlisting}
 
-然而经过测试，这种实现的计算效率甚至不如串行算法，因此有了下面的 call\_once 实现。
+然而经过测试，这种实现的计算效率甚至不如串行算法（表\ref{tab:thread}），因此有了下面的 call\_once 实现。
 
 再次观察可以注意到，实际上映射数组里的每一种消元子只会被初始化一次，能够对应保证线程安全的前提下初始化单例类型的模型，即双重检查锁定模型。换言之存在减少加锁次数提高性能的优化空间。对于支持 C++11 以上的编译器，存在 call\_once 和 once\_flag 原语。对call\_once传入once\_flag标志和回调函数func即可实现线程安全的前提下仅第一次成功调用回调函数func。称为"积极调用"，并对once\_flag翻转；此后再次向call\_once传入once\_flag就直接返回，称为"消极调用"。避免了双重检查锁定模型的繁琐和危险。因此我们有了另一种不使用boost的更快的实现 \ref{code:call-once}。
 
@@ -329,6 +329,29 @@ void gauss(bitset_matrix_t& m) {
 \subsection{运行情况分析}
 \subsubsection{计时方式}
 
+
+\begin{table}[]
+  \centering
+  \caption{多线程不同实现运行情况}
+  \label{tab:thread}
+  \resizebox{\textwidth}{!}{%
+    \begin{tabular}{llll}
+      \hline
+      Matrix rank & serial bitset (ms) & 16 threads rwlock bitset (ms) & 16 threads call\_once bitset (ms) \\ \hline
+      130         & 0.099817           & 1.406358                      & 2.402953                          \\ \hline
+      254         & 3.173488           & 36.153601                     & 2.272141                          \\ \hline
+      562         & 3.08886            & 24.075979                     & 1.877817                          \\ \hline
+      1011        & 98.256365          & 1296.45696                    & 12.519157                         \\ \hline
+      2362        & 426.11729          & 5158.95778                    & 58.782182                         \\ \hline
+      3799        & 5026.35341         & 62177.1912                    & 649.369009                        \\ \hline
+      8399        & 30331.4359         & \textgreater{}1200000         & 5585.23381                        \\ \hline
+      23045       & 220484.326         & \textgreater{}1200000         & 49605.6164                        \\ \hline
+      37960       & 322201.459         & \textgreater{}1200000         & 77384.6553                        \\ \hline
+      43577       & 1016832.99         & \textgreater{}1200000         & 252625.626                        \\ \hline
+      85401       & 440.782952         & 6335.83031                    & 85.025176                         \\ \hline
+    \end{tabular}%
+  }
+\end{table}
 
 \begin{table}[]
   \centering
