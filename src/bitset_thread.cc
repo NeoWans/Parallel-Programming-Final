@@ -6,7 +6,7 @@ using namespace std;
 namespace fs = filesystem;
 
 const auto num_thread = thread::hardware_concurrency();
-once_flag  flag_v[matrix_max_sz];
+once_flag* flag_v;
 
 void thread_callback(size_t index, bitset_matrix_t& m) {
   for (size_t local_index = index; local_index < m.op.size();
@@ -29,10 +29,12 @@ void thread_callback(size_t index, bitset_matrix_t& m) {
 }
 
 void gauss(bitset_matrix_t& m) {
+  flag_v = new once_flag[m.row_sz];
   list<thread> thread_pool;
   for (unsigned i = 0; i < num_thread; ++i)
     thread_pool.push_back(thread(thread_callback, i, ref(m)));
   for (auto& t : thread_pool) t.join();
+  delete[] flag_v;
 }
 
 // 必须接受至少一个参数，第一个参数指向输入目录，内容为 i.0 i.1 i.2，表示 i
