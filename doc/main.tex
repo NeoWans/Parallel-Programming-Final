@@ -236,6 +236,10 @@ $lp(E[i])$：被消元行第 $i$ 行的首项
 实验在本地 x86 Arch Linux 环境下完成，使用 Makefile 构建项目，开启 Ofast 加速；
 使用的 CPU 为 AMD Ryzen 4800HS (8C16T)，系统 RAM 大小为 38.6G，显卡为 nVIDIA RTX 2060 6G。
 
+\subsection{分工方式}
+由丁屹实现倒排链表的数据结构、Makefile 构建脚本编写、多线程call\_once原语、MPI多进程研究、数据测试汇总、Debug；
+卢麒萱实现bitset的数据结构和程序I/O、矩阵封装、GPU CUDA加速研究，多线程读写锁、多线程原子操作研究的研究。
+
 \subsection{串行倒排链表算法}
 使用STL list存储矩阵中每行的非零位置，逐行放入嵌套的外层STL list；
 使用STL map存储消元行首项与消元行的映射。
