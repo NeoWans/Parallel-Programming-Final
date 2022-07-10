@@ -5,10 +5,9 @@
 using namespace std;
 namespace fs = filesystem;
 
-const auto num_thread = thread::hardware_concurrency();
-once_flag* flag_v;
+const auto num_thread = thread::hardware_concurrency() - 1;
 
-void thread_callback(size_t index, bitset_matrix_t& m) {
+void thread_callback(size_t index, bitset_matrix_t& m, once_flag* flag_v) {
   for (size_t local_index = index; local_index < m.op.size();
        local_index += num_thread) {
     auto& eliminatee = m.op.at(local_index);
@@ -29,10 +28,10 @@ void thread_callback(size_t index, bitset_matrix_t& m) {
 }
 
 void gauss(bitset_matrix_t& m) {
-  flag_v = new once_flag[m.row_sz];
+  auto         flag_v = new once_flag[m.row_sz];
   list<thread> thread_pool;
   for (unsigned i = 0; i < num_thread; ++i)
-    thread_pool.push_back(thread(thread_callback, i, ref(m)));
+    thread_pool.push_back(thread(thread_callback, i, ref(m), flag_v));
   for (auto& t : thread_pool) t.join();
   delete[] flag_v;
 }
